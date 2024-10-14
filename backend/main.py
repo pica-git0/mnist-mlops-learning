@@ -12,7 +12,7 @@ from ml.utils import set_device
 from backend.models import DeleteApiData, TrainApiData, PredictApiData
 
 
-#mlflow.set_tracking_uri('sqlite:///backend.db')
+# mlflow.set_tracking_uri('sqlite:///backend.db')
 mlflow.set_tracking_uri("sqlite:///db/backend.db")
 app = FastAPI()
 mlflowclient = MlflowClient(
@@ -75,7 +75,7 @@ async def read_root():
 @app.get("/models")
 async def get_models_api():
     """Gets a list with model names"""
-    model_list = mlflowclient.list_registered_models()
+    model_list = mlflowclient.search_registered_models()
     model_list = [model.name for model in model_list]
     return model_list
 
@@ -116,7 +116,7 @@ async def predict_api(data: PredictApiData):
 async def delete_model_api(data: DeleteApiData):
     model_name = data.model_name
     version = data.model_version
-    
+
     if version is None:
         # Delete all versions
         mlflowclient.delete_registered_model(name=model_name)
