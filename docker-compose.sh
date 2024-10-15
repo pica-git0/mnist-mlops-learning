@@ -1,0 +1,1 @@
+docker-compose -f docker-compose-mlflow.yml -f docker-compose-airflow.yml up -d
