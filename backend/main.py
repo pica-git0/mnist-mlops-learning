@@ -15,8 +15,7 @@ from backend.models import DeleteApiData, TrainApiData, PredictApiData
 # mlflow.set_tracking_uri('sqlite:///backend.db')
 mlflow.set_tracking_uri("sqlite:///db/backend.db")
 app = FastAPI()
-mlflowclient = MlflowClient(
-    mlflow.get_tracking_uri(), mlflow.get_registry_uri())
+mlflowclient = MlflowClient(mlflow.get_tracking_uri(), mlflow.get_registry_uri())
 
 
 def train_model_task(model_name: str, hyperparams: dict, epochs: int):
@@ -54,27 +53,29 @@ def train_model_task(model_name: str, hyperparams: dict, epochs: int):
 
         # Model registry does not work with file store
         if tracking_url_type_store != "file":
-            mlflow.pytorch.log_model(
-                model, "LinearModel", registered_model_name=model_name, conda_env=mlflow.pytorch.get_default_conda_env())
+            mlflow.pytorch.log_model(model, "LinearModel", registered_model_name=model_name, conda_env=mlflow.pytorch.get_default_conda_env())
         else:
-            mlflow.pytorch.log_model(
-                model, "LinearModel-MNIST", registered_model_name=model_name)
+            mlflow.pytorch.log_model(model, "LinearModel-MNIST", registered_model_name=model_name)
         # Transition to production. We search for the last model with the name and we stage it to production
-        mv = mlflowclient.search_model_versions(
-            f"name='{model_name}'")[-1]  # Take last model version
-        mlflowclient.transition_model_version_stage(
-            name=mv.name, version=mv.version, stage="production")
+        mv = mlflowclient.search_model_versions(f"name='{model_name}'")[-1]  # Take last model version
+        mlflowclient.transition_model_version_stage(name=mv.name, version=mv.version, stage="production")
 
 
 @app.get("/")
 async def read_root():
-    return {"Tracking URI": mlflow.get_tracking_uri(),
-            "Registry URI": mlflow.get_registry_uri()}
+    return {"Tracking URI": mlflow.get_tracking_uri(), "Registry URI": mlflow.get_registry_uri()}
 
 
 @app.get("/models")
 async def get_models_api():
     """Gets a list with model names"""
+    """_summary_
+    mlflow Registry
+    
+    모델의 버전 정보, 상태(staging, production)을 추적하고 등록된 모델의 목록을 검색
+    Returns:
+        _type_: _description_
+    """
     model_list = mlflowclient.search_registered_models()
     model_list = [model.name for model in model_list]
     return model_list
@@ -87,8 +88,7 @@ async def train_api(data: TrainApiData, background_tasks: BackgroundTasks):
     epochs = data.epochs
     model_name = data.model_name
 
-    background_tasks.add_task(
-        train_model_task, model_name, hyperparams, epochs)
+    background_tasks.add_task(train_model_task, model_name, hyperparams, epochs)
 
     return {"result": "Training task started"}
 
@@ -96,12 +96,17 @@ async def train_api(data: TrainApiData, background_tasks: BackgroundTasks):
 @app.post("/predict")
 async def predict_api(data: PredictApiData):
     """Predicts on the provided image"""
+    """_summary_
+    
+    모델을 서빙(MLflow Models)
+    
+    Returns:
+        _type_: _description_
+    """
     img = data.input_image
     model_name = data.model_name
     # Fetch the last model in production
-    model = mlflow.pyfunc.load_model(
-        model_uri=f"models:/{model_name}/Production"
-    )
+    model = mlflow.pyfunc.load_model(model_uri=f"models:/{model_name}/Production")
     # Preprocess the image
     # Flatten input, create a batch of one and normalize
     img = np.array(img, dtype=np.float32).flatten()[np.newaxis, ...] / 255
@@ -124,10 +129,8 @@ async def delete_model_api(data: DeleteApiData):
     elif isinstance(version, list):
         for v in version:
             mlflowclient.delete_model_version(name=model_name, version=v)
-        response = {
-            "result": f"Deleted versions {version} of model {model_name}"}
+        response = {"result": f"Deleted versions {version} of model {model_name}"}
     else:
         mlflowclient.delete_model_version(name=model_name, version=version)
-        response = {
-            "result": f"Deleted version {version} of model {model_name}"}
+        response = {"result": f"Deleted version {version} of model {model_name}"}
     return response
